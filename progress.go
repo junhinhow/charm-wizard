@@ -52,8 +52,15 @@ var (
 
 // RenderProgress renderiza o indicador visual de progresso para as etapas.
 // Mostra pontos para cada etapa (concluida/atual/pendente) e uma barra de progresso.
+//
+// Devolve uma string vazia quando a lista de etapas esta vazia ou quando o
+// indice informado esta fora dos limites, evitando panicked em um indice
+// invalido.
 func RenderProgress(steps []Step, currentIndex int) string {
 	if len(steps) == 0 {
+		return ""
+	}
+	if currentIndex < 0 || currentIndex >= len(steps) {
 		return ""
 	}
 
@@ -61,7 +68,7 @@ func RenderProgress(steps []Step, currentIndex int) string {
 
 	// Linha de informacao: "Etapa 2 de 4: Configuracao"
 	etapaAtual := steps[currentIndex]
-	info := fmt.Sprintf("Step %d of %d: %s", currentIndex+1, len(steps), etapaAtual.Description)
+	info := fmt.Sprintf("Etapa %d de %d: %s", currentIndex+1, len(steps), etapaAtual.Description)
 	sb.WriteString(stepInfoStyle.Render(info))
 	sb.WriteString("\n")
 
@@ -104,19 +111,42 @@ func renderDots(steps []Step, currentIndex int) string {
 }
 
 // renderBar renderiza uma barra de progresso visual.
+// O percentual e a barra preenchida ficam sempre entre 0 e 100%.
 func renderBar(total, current int) string {
-	largura := 30
-	preenchido := 0
-	if total > 0 {
-		preenchido = ((current + 1) * largura) / total
+	const largura = 30
+
+	if total <= 0 {
+		return barEmptyStyle.Render(strings.Repeat("░", largura))
 	}
+
+	// Limita o indice: um indice fora dos limites geraria percentuais acima
+	// de 100% (por exemplo, 300%) enquanto a barra continua com 30 colunas.
+	indice := current
+	if indice < 0 {
+		indice = 0
+	}
+	if indice > total-1 {
+		indice = total - 1
+	}
+
+	preenchido := ((indice + 1) * largura) / total
 	if preenchido > largura {
 		preenchido = largura
+	}
+	if preenchido < 0 {
+		preenchido = 0
+	}
+
+	percentual := ((indice + 1) * 100) / total
+	if percentual > 100 {
+		percentual = 100
+	}
+	if percentual < 0 {
+		percentual = 0
 	}
 
 	barraCheia := barFilledStyle.Render(strings.Repeat("█", preenchido))
 	barraVazia := barEmptyStyle.Render(strings.Repeat("░", largura-preenchido))
-	percentual := ((current + 1) * 100) / total
 
 	return fmt.Sprintf("%s%s %d%%", barraCheia, barraVazia, percentual)
 }
@@ -128,5 +158,5 @@ func renderTitle(title string) string {
 
 // renderComplete renderiza a mensagem de conclusao.
 func renderComplete(title string) string {
-	return completeStyle.Render(fmt.Sprintf("✓ %s completed successfully!", title))
+	return completeStyle.Render(fmt.Sprintf("✓ %s concluído com sucesso!", title))
 }
